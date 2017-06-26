@@ -22,7 +22,7 @@ LDFLAGS =
 
 INCLUDES = -Iinclude
 
-LIBS = -lphidget22
+LIBS = /usr/local/lib/libphidget22.a -ludev -lusb-1.0 -lpthread -lm -ldl
 
 all: dirs $(TARGET)
 
