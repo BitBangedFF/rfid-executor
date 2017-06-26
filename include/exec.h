@@ -11,8 +11,9 @@
 
 typedef struct
 {
-    const char * const src_tag;
-    const char * const cmd;
+    long serial_number;
+    const char * src_tag;
+    const char * cmd;
     size_t tag_size;
 } on_tag_data_s;
 

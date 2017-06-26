@@ -22,7 +22,7 @@ LDFLAGS =
 
 INCLUDES = -Iinclude
 
-LIBS = -lphidget22
+LIBS = -lphidget22 -lpopt
 
 all: dirs $(TARGET)
 
