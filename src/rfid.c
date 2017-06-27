@@ -18,7 +18,6 @@
 
 
 #define OPEN_TIMEOUT_MS (5000)
-#define LED_CHANNEL (1)
 
 
 static int p_err(
