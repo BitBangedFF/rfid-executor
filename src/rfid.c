@@ -18,6 +18,7 @@
 
 
 #define OPEN_TIMEOUT_MS (5000)
+#define LED_CHANNEL (1)
 
 
 static int p_err(
@@ -131,6 +132,17 @@ int rfid_init(
         }
     }
 
+    if(ret == 0)
+    {
+        p_ret = PhidgetRFID_setAntennaEnabled(
+                *handle,
+                1);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("PhidgetRFID_setAntennaEnabled", p_ret);
+        }
+    }
+
     return ret;
 }
 
@@ -142,6 +154,10 @@ void rfid_fini(
 
     if(handle != NULL)
     {
+        (void) PhidgetRFID_setAntennaEnabled(
+                *handle,
+                0);
+
         p_ret = Phidget_close((PhidgetHandle) *handle);
         if(p_ret != EPHIDGET_OK)
         {
