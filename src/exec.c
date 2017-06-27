@@ -10,8 +10,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <phidget22.h>
-
 #include "exec.h"
 
 
@@ -56,9 +54,5 @@ void exec_on_tag(
         {
             do_command(on_tag_data);
         }
-    }
-    else
-    {
-        show_tag(tag);
     }
 }

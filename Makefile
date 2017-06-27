@@ -3,7 +3,7 @@
 
 TARGET := bin/rfid-executor
 
-SRCS := src/exec.c src/main.c
+SRCS := src/rfid.c src/exec.c src/main.c
 
 OBJS := $(SRCS:.c=.o)
 DEPS := $(SRCS:.c=.dep)

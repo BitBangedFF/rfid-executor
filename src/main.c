@@ -102,7 +102,7 @@ int main(int argc, char **argv)
             &on_tag_data.serial_number,
             OPTION_SERIAL_NUMBER | POPT_ARGFLAG_OPTIONAL,
             "serial number of RFID reader to open",
-            "'phidget RFID serial number'"
+            "'phidget RFID serial number (0 means any)'"
         },
         {
             "tag",
