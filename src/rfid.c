@@ -18,6 +18,7 @@
 
 
 #define OPEN_TIMEOUT_MS (5000)
+#define LED_CHANNEL (1)
 
 
 static int p_err(
@@ -51,21 +52,76 @@ static void on_tag_handler(
         const char *tag,
         PhidgetRFID_Protocol protocol)
 {
-    exec_on_tag(tag, (const on_tag_data_s * const) ctx);
+    rfid_s * const rfid = (rfid_s*) ctx;
+
+    if(rfid != NULL)
+    {
+        const int status = exec_is_allowed(
+                tag,
+                rfid->on_tag_data);
+
+        if(status == EXEC_STATUS_ALLOWED)
+        {
+            (void) PhidgetDigitalOutput_setState(
+                    rfid->led_ch,
+                    1);
+        }
+
+        exec_on_tag(tag, rfid->on_tag_data);
+
+        (void) sleep(1);
+
+        (void) PhidgetDigitalOutput_setState(
+                rfid->led_ch,
+                0);
+    }
 }
 
 
 int rfid_init(
-        PhidgetRFIDHandle * const handle,
+        rfid_s * const rfid,
         const on_tag_data_s * const on_tag_data)
 {
     int ret = 0;
     PhidgetReturnCode p_ret;
 
-    p_ret = PhidgetRFID_create(handle);
-    if(p_ret != EPHIDGET_OK)
+    if((rfid == NULL) || (on_tag_data == NULL))
     {
-        ret = p_err("PhidgetRFID_create", p_ret);
+        ret = -1;
+    }
+
+    if(ret == 0)
+    {
+        rfid->on_tag_data = on_tag_data;
+    }
+
+    if(ret == 0)
+    {
+        p_ret = PhidgetRFID_create(&rfid->rfid_ch);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("PhidgetRFID_create", p_ret);
+        }
+    }
+
+    if(ret == 0)
+    {   
+        p_ret = PhidgetDigitalOutput_create(&rfid->led_ch);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("PhidgetDigitalOutput_create", p_ret);
+        }
+    }
+
+    if(ret == 0)
+    {
+        p_ret = Phidget_setChannel(
+                (PhidgetHandle) rfid->led_ch,
+                LED_CHANNEL);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("Phidget_setChannel", p_ret);
+        }
     }
 
     if(ret == 0)
@@ -73,7 +129,7 @@ int rfid_init(
         if(on_tag_data->serial_number > 0)
         {
             p_ret = Phidget_setDeviceSerialNumber(
-                    (PhidgetHandle) *handle,
+                    (PhidgetHandle) rfid->rfid_ch,
                     (int32_t) on_tag_data->serial_number);
             if(p_ret != EPHIDGET_OK)
             {
@@ -85,9 +141,9 @@ int rfid_init(
     if(ret == 0)
     {
         p_ret = PhidgetRFID_setOnTagHandler(
-                *handle,
+                rfid->rfid_ch,
                 on_tag_handler,
-                (void*) on_tag_data);
+                (void*) rfid);
         if(p_ret != EPHIDGET_OK)
         {
             ret = p_err("PhidgetRFID_setOnTagHandler", p_ret);
@@ -97,11 +153,22 @@ int rfid_init(
     if(ret == 0)
     {
         p_ret = Phidget_openWaitForAttachment(
-                (PhidgetHandle) *handle,
+                (PhidgetHandle) rfid->rfid_ch,
                 OPEN_TIMEOUT_MS);
         if(p_ret != EPHIDGET_OK)
         {
-            ret = p_err("Phidget_openWaitForAttachment", p_ret);
+            ret = p_err("Phidget_openWaitForAttachment (RFID)", p_ret);
+        }
+    }
+
+    if(ret == 0)
+    {
+        p_ret = Phidget_openWaitForAttachment(
+                (PhidgetHandle) rfid->led_ch,
+                OPEN_TIMEOUT_MS);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("Phidget_openWaitForAttachment (LED)", p_ret);
         }
     }
 
@@ -112,7 +179,7 @@ int rfid_init(
             int32_t sn = 0;
 
             p_ret = Phidget_getDeviceSerialNumber(
-                    (PhidgetHandle) *handle,
+                    (PhidgetHandle) rfid->rfid_ch,
                     &sn);
             if(p_ret != EPHIDGET_OK)
             {
@@ -134,11 +201,22 @@ int rfid_init(
     if(ret == 0)
     {
         p_ret = PhidgetRFID_setAntennaEnabled(
-                *handle,
+                rfid->rfid_ch,
                 1);
         if(p_ret != EPHIDGET_OK)
         {
             ret = p_err("PhidgetRFID_setAntennaEnabled", p_ret);
+        }
+    }
+
+    if(ret == 0)
+    {
+        p_ret = PhidgetDigitalOutput_setState(
+                rfid->led_ch,
+                0);
+        if(p_ret != EPHIDGET_OK)
+        {
+            ret = p_err("PhidgetDigitalOutput_setState", p_ret);
         }
     }
 
@@ -147,23 +225,39 @@ int rfid_init(
 
 
 void rfid_fini(
-        PhidgetRFIDHandle *  const handle)
+        rfid_s * const rfid)
 {
     PhidgetReturnCode p_ret;
 
-    if(handle != NULL)
+    if(rfid != NULL)
     {
         (void) PhidgetRFID_setAntennaEnabled(
-                *handle,
+                rfid->rfid_ch,
                 0);
 
-        p_ret = Phidget_close((PhidgetHandle) *handle);
+        (void) PhidgetDigitalOutput_setState(
+                rfid->led_ch,
+                0);
+
+        p_ret = Phidget_close((PhidgetHandle) rfid->led_ch);
         if(p_ret != EPHIDGET_OK)
         {
-            (void) p_err("Phidget_close", p_ret);
+            (void) p_err("Phidget_close (LED)", p_ret);
         }
 
-        p_ret = PhidgetRFID_delete(handle);
+        p_ret = Phidget_close((PhidgetHandle) rfid->rfid_ch);
+        if(p_ret != EPHIDGET_OK)
+        {
+            (void) p_err("Phidget_close (RFID)", p_ret);
+        }
+
+        p_ret = PhidgetDigitalOutput_delete(&rfid->led_ch);
+        if(p_ret != EPHIDGET_OK)
+        {
+            (void) p_err("PhidgetDigitalOutput_delete", p_ret);
+        }
+
+        p_ret = PhidgetRFID_delete(&rfid->rfid_ch);
         if(p_ret != EPHIDGET_OK)
         {
             (void) p_err("PhidgetRFID_delete", p_ret);

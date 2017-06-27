@@ -12,7 +12,6 @@
 #include <signal.h>
 
 #include <popt.h>
-#include <phidget22.h>
 
 #include "exec.h"
 #include "rfid.h"
@@ -43,8 +42,8 @@ int main(int argc, char **argv)
 {
     int ret = 0;
     poptContext opt_ctx;
-    PhidgetRFIDHandle handle;
     on_tag_data_s on_tag_data;
+    rfid_s rfid;
 
     const struct poptOption OPTIONS_TABLE[] =
     {
@@ -88,6 +87,7 @@ int main(int argc, char **argv)
         POPT_TABLEEND
     };
 
+    (void) memset(&rfid, 0, sizeof(rfid));
     (void) memset(&on_tag_data, 0, sizeof(on_tag_data));
 
     global_exit_signal = 0;
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
                 (on_tag_data.cmd == NULL) ? "NA" : on_tag_data.cmd);
     }
 
-    ret = rfid_init(&handle, &on_tag_data);
+    ret = rfid_init(&rfid, &on_tag_data);
     if(ret != 0)
     {
         global_exit_signal = 1;
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
         (void) sleep(1);
     }
 
-    rfid_fini(&handle);
+    rfid_fini(&rfid);
 
     if(on_tag_data.src_tag != NULL)
     {

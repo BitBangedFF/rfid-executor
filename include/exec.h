@@ -9,6 +9,10 @@
 #define EXEC_H
 
 
+#define EXEC_STATUS_ALLOWED (0)
+#define EXEC_STATUS_DENIED (1)
+
+
 typedef struct
 {
     unsigned int verbose;
@@ -17,6 +21,11 @@ typedef struct
     char *cmd;
     size_t tag_size;
 } on_tag_data_s;
+
+
+int exec_is_allowed(
+        const char * const tag,
+        const on_tag_data_s * const on_tag_data);
 
 
 void exec_on_tag(
