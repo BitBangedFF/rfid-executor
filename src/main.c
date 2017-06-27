@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -16,9 +15,7 @@
 #include <phidget22.h>
 
 #include "exec.h"
-
-
-#define OPEN_TIMEOUT_MS (5000)
+#include "rfid.h"
 
 
 enum option_kind
@@ -30,56 +27,21 @@ enum option_kind
 };
 
 
-static sig_atomic_t global_exit_signal = 0;
+static sig_atomic_t global_exit_signal;
 
 
-static void sig_handler( int sig )
+static void sig_handler(int sig)
 {
-    if( sig == SIGINT )
+    if(sig == SIGINT)
     {
         global_exit_signal = 1;
     }
 }
 
 
-static void error_exit(
-        const char * const label,
-        const PhidgetReturnCode p_ret)
-{
-    const char *err;
-
-    if(p_ret != EPHIDGET_OK)
-    {
-        (void) Phidget_getErrorDescription(p_ret, &err);
-
-        (void) fprintf(
-                stderr,
-                "%s : %s\n", label, err);
-    }
-    else if(label != NULL)
-    {
-        (void) fprintf(
-                stderr,
-                "%s\n", label);
-    }
-
-    exit(EXIT_FAILURE);
-}
-
-
-static void on_tag_handler(
-        PhidgetRFIDHandle handle,
-        void *ctx,
-        const char *tag,
-        PhidgetRFID_Protocol protocol)
-{
-    exec_on_tag(tag, (const on_tag_data_s * const) ctx);
-}
-
-
 int main(int argc, char **argv)
 {
-    PhidgetReturnCode p_ret;
+    int ret = 0;
     poptContext opt_ctx;
     PhidgetRFIDHandle handle;
     on_tag_data_s on_tag_data;
@@ -128,6 +90,7 @@ int main(int argc, char **argv)
 
     (void) memset(&on_tag_data, 0, sizeof(on_tag_data));
 
+    global_exit_signal = 0;
     (void) signal(SIGINT, sig_handler);
     (void) siginterrupt(SIGINT, 1);
 
@@ -141,7 +104,11 @@ int main(int argc, char **argv)
     int opt_ret;
     while((opt_ret = poptGetNextOpt(opt_ctx)) >= 0)
     {
-        if(opt_ret == OPTION_SERIAL_NUMBER)
+        if(opt_ret == OPTION_VERBOSE)
+        {
+            on_tag_data.verbose = 1;
+        }
+        else if(opt_ret == OPTION_SERIAL_NUMBER)
         {
             if(on_tag_data.serial_number <= 0)
             {
@@ -150,7 +117,7 @@ int main(int argc, char **argv)
                         "serial number must be greater than zero\n");
                 poptPrintUsage(opt_ctx, stderr, 0);
                 poptFreeContext(opt_ctx);
-                error_exit(NULL, 0);
+                exit(EXIT_FAILURE);
             }
         }
     }
@@ -164,50 +131,30 @@ int main(int argc, char **argv)
                 poptStrerror(opt_ret));
         poptPrintUsage(opt_ctx, stderr, 0);
         poptFreeContext(opt_ctx);
-        error_exit(NULL, 0);
+        exit(EXIT_FAILURE);
     }
 
     poptFreeContext(opt_ctx);
 
-    printf(
-            "serial-number '%ld' - src_tag '%s' - cmd '%s'\n",
-            on_tag_data.serial_number,
-            (on_tag_data.src_tag == NULL) ? "NA" : on_tag_data.src_tag,
-            (on_tag_data.cmd == NULL) ? "NA" : on_tag_data.cmd);
-
-    p_ret = PhidgetRFID_create(&handle);
-    if(p_ret != EPHIDGET_OK)
+    if(on_tag_data.src_tag != NULL)
     {
-        error_exit("PhidgetRFID_create", p_ret);
+        on_tag_data.tag_size = strlen(on_tag_data.src_tag);
     }
 
-    if(on_tag_data.serial_number > 0)
+    if(on_tag_data.verbose != 0)
     {
-        p_ret = Phidget_setDeviceSerialNumber(
-                (PhidgetHandle) handle,
-                (int32_t) on_tag_data.serial_number);
-        if(p_ret != EPHIDGET_OK)
-        {
-            (void) PhidgetRFID_delete(&handle);
-            error_exit("Phidget_setDeviceSerialNumber", p_ret);
-        }
+        (void) fprintf(
+                stdout,
+                "serial-number '%ld' -- src_tag '%s' -- cmd '%s'\n",
+                on_tag_data.serial_number,
+                (on_tag_data.src_tag == NULL) ? "NA" : on_tag_data.src_tag,
+                (on_tag_data.cmd == NULL) ? "NA" : on_tag_data.cmd);
     }
 
-    p_ret = PhidgetRFID_setOnTagHandler(
-            handle,
-            on_tag_handler,
-            (void*) &on_tag_data);
-    if(p_ret != EPHIDGET_OK)
+    ret = rfid_init(&handle, &on_tag_data);
+    if(ret != 0)
     {
-        (void) PhidgetRFID_delete(&handle);
-        error_exit("PhidgetRFID_setOnTagHandler", p_ret);
-    }
-
-    p_ret = Phidget_openWaitForAttachment((PhidgetHandle) handle, OPEN_TIMEOUT_MS);
-    if(p_ret != EPHIDGET_OK)
-    {
-        (void) PhidgetRFID_delete(&handle);
-        error_exit("Phidget_openWaitForAttachment", p_ret);
+        global_exit_signal = 1;
     }
 
     while(global_exit_signal == 0)
@@ -215,17 +162,7 @@ int main(int argc, char **argv)
         (void) sleep(1);
     }
 
-    p_ret = Phidget_close((PhidgetHandle) handle);
-    if(p_ret != EPHIDGET_OK)
-    {
-        error_exit("Phidget_close", p_ret);
-    }
-
-    p_ret = PhidgetRFID_delete(&handle);
-    if(p_ret != EPHIDGET_OK)
-    {
-        error_exit("PhidgetRFID_delete", p_ret);
-    }
+    rfid_fini(&handle);
 
     if(on_tag_data.src_tag != NULL)
     {
@@ -237,5 +174,14 @@ int main(int argc, char **argv)
         free(on_tag_data.cmd);
     }
 
-    return EXIT_SUCCESS;
+    if(ret == 0)
+    {
+        ret = EXIT_SUCCESS;
+    }
+    else
+    {
+        ret = EXIT_FAILURE;
+    }
+
+    return ret;
 }

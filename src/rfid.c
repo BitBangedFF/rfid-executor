@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #include <phidget22.h>
@@ -76,7 +77,6 @@ int rfid_init(
                     (int32_t) on_tag_data->serial_number);
             if(p_ret != EPHIDGET_OK)
             {
-                (void) PhidgetRFID_delete(handle);
                 ret = p_err("Phidget_setDeviceSerialNumber", p_ret);
             }
         }
@@ -90,7 +90,6 @@ int rfid_init(
                 (void*) on_tag_data);
         if(p_ret != EPHIDGET_OK)
         {
-            (void) PhidgetRFID_delete(handle);
             ret = p_err("PhidgetRFID_setOnTagHandler", p_ret);
         }
     }
@@ -102,8 +101,33 @@ int rfid_init(
                 OPEN_TIMEOUT_MS);
         if(p_ret != EPHIDGET_OK)
         {
-            (void) PhidgetRFID_delete(handle);
             ret = p_err("Phidget_openWaitForAttachment", p_ret);
+        }
+    }
+
+    if(ret == 0)
+    {
+        if(on_tag_data->serial_number <= 0)
+        {
+            int32_t sn = 0;
+
+            p_ret = Phidget_getDeviceSerialNumber(
+                    (PhidgetHandle) *handle,
+                    &sn);
+            if(p_ret != EPHIDGET_OK)
+            {
+                ret = p_err("Phidget_getDeviceSerialNumber", p_ret);
+            }
+            else
+            {
+                if(on_tag_data->verbose != 0)
+                {
+                    (void) fprintf(
+                            stdout,
+                            "found device with serial number '%ld'\n",
+                            (long) sn);
+                }
+            }
         }
     }
 

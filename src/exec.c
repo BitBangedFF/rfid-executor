@@ -18,7 +18,10 @@ static void show_tag(
 {
     if(tag != NULL)
     {
-        printf("tag '%s'\n", tag);
+        (void) fprintf(
+                stdout,
+                "on-tag '%s'\n",
+                tag);
     }
 }
 
@@ -28,6 +31,14 @@ static void do_command(
 {
     if(on_tag_data->cmd != NULL)
     {
+        if(on_tag_data->verbose != 0)
+        {
+            (void) fprintf(
+                    stdout,
+                    "exec command '%s'\n",
+                    on_tag_data->cmd);
+        }
+
         (void) system(on_tag_data->cmd);
     }
 }
@@ -39,6 +50,11 @@ void exec_on_tag(
 {
     if((tag != NULL) && (on_tag_data != NULL))
     {
+        if(on_tag_data->verbose != 0)
+        {
+            show_tag(tag);
+        }
+
         if(on_tag_data->src_tag != NULL)
         {
             const int diff = strncmp(

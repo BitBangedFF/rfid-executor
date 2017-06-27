@@ -11,6 +11,7 @@
 
 typedef struct
 {
+    unsigned int verbose;
     long serial_number;
     char *src_tag;
     char *cmd;
