@@ -18,7 +18,10 @@
 static void show_tag(
         const char * const tag)
 {
-    printf("tag '%s'\n", tag);
+    if(tag != NULL)
+    {
+        printf("tag '%s'\n", tag);
+    }
 }
 
 

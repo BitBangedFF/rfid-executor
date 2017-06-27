@@ -12,8 +12,8 @@
 typedef struct
 {
     long serial_number;
-    const char * src_tag;
-    const char * cmd;
+    char *src_tag;
+    char *cmd;
     size_t tag_size;
 } on_tag_data_s;
 

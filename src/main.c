@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -17,10 +18,15 @@
 #include "exec.h"
 
 
+#define OPEN_TIMEOUT_MS (5000)
+
+
 enum option_kind
 {
-    OPTION_SERIAL_NUMBER = 1,
-    OPTION_TAG = 2
+    OPTION_VERBOSE = 1,
+    OPTION_SERIAL_NUMBER = 2,
+    OPTION_TAG = 3,
+    OPTION_COMMAND = 4
 };
 
 
@@ -81,22 +87,40 @@ int main(int argc, char **argv)
     const struct poptOption OPTIONS_TABLE[] =
     {
         {
+            "verbose",
+            'v',
+            POPT_ARG_NONE,
+            NULL,
+            OPTION_VERBOSE,
+            "enable verbose output",
+            NULL
+        },
+        {
             "serial-number",
             's',
             POPT_ARG_LONG,
             &on_tag_data.serial_number,
-            OPTION_SERIAL_NUMBER,
-            "serial number to RFID reader to open",
+            OPTION_SERIAL_NUMBER | POPT_ARGFLAG_OPTIONAL,
+            "serial number of RFID reader to open",
             "'phidget RFID serial number'"
         },
         {
             "tag",
             't',
             POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
-            NULL,
+            &on_tag_data.src_tag,
             OPTION_TAG,
             "only allow the specified tag",
             "'source tag string'"
+        },
+        {
+            "command",
+            'c',
+            POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
+            &on_tag_data.cmd,
+            OPTION_COMMAND,
+            "command to execute when a tag is detected",
+            "'command string'"
         },
         POPT_AUTOHELP
         POPT_TABLEEND
@@ -114,22 +138,20 @@ int main(int argc, char **argv)
             OPTIONS_TABLE,
             0);
 
-    if(argc < 2)
-    {
-        poptPrintUsage(opt_ctx, stderr, 0);
-        poptFreeContext(opt_ctx);
-        error_exit(NULL, 0);
-    }
-
     int opt_ret;
     while((opt_ret = poptGetNextOpt(opt_ctx)) >= 0)
     {
         if(opt_ret == OPTION_SERIAL_NUMBER)
         {
-        }
-        else if(opt_ret == OPTION_TAG)
-        {
-            on_tag_data.src_tag = poptGetOptArg(opt_ctx);
+            if(on_tag_data.serial_number <= 0)
+            {
+                (void) fprintf(
+                        stderr,
+                        "serial number must be greater than zero\n");
+                poptPrintUsage(opt_ctx, stderr, 0);
+                poptFreeContext(opt_ctx);
+                error_exit(NULL, 0);
+            }
         }
     }
 
@@ -147,17 +169,28 @@ int main(int argc, char **argv)
 
     poptFreeContext(opt_ctx);
 
+    printf(
+            "serial-number '%ld' - src_tag '%s' - cmd '%s'\n",
+            on_tag_data.serial_number,
+            (on_tag_data.src_tag == NULL) ? "NA" : on_tag_data.src_tag,
+            (on_tag_data.cmd == NULL) ? "NA" : on_tag_data.cmd);
+
     p_ret = PhidgetRFID_create(&handle);
     if(p_ret != EPHIDGET_OK)
     {
         error_exit("PhidgetRFID_create", p_ret);
     }
 
-    p_ret = Phidget_setDeviceSerialNumber((PhidgetHandle) handle, 332158);
-    if(p_ret != EPHIDGET_OK)
+    if(on_tag_data.serial_number > 0)
     {
-        (void) PhidgetRFID_delete(&handle);
-        error_exit("Phidget_setDeviceSerialNumber", p_ret);
+        p_ret = Phidget_setDeviceSerialNumber(
+                (PhidgetHandle) handle,
+                (int32_t) on_tag_data.serial_number);
+        if(p_ret != EPHIDGET_OK)
+        {
+            (void) PhidgetRFID_delete(&handle);
+            error_exit("Phidget_setDeviceSerialNumber", p_ret);
+        }
     }
 
     p_ret = PhidgetRFID_setOnTagHandler(
@@ -170,7 +203,7 @@ int main(int argc, char **argv)
         error_exit("PhidgetRFID_setOnTagHandler", p_ret);
     }
 
-    p_ret = Phidget_openWaitForAttachment((PhidgetHandle) handle, 5000);
+    p_ret = Phidget_openWaitForAttachment((PhidgetHandle) handle, OPEN_TIMEOUT_MS);
     if(p_ret != EPHIDGET_OK)
     {
         (void) PhidgetRFID_delete(&handle);
@@ -196,7 +229,12 @@ int main(int argc, char **argv)
 
     if(on_tag_data.src_tag != NULL)
     {
-        free((void*) on_tag_data.src_tag);
+        free(on_tag_data.src_tag);
+    }
+
+    if(on_tag_data.cmd != NULL)
+    {
+        free(on_tag_data.cmd);
     }
 
     return EXIT_SUCCESS;
