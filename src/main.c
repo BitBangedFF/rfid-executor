@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 
     while(global_exit_signal == 0)
     {
-        (void) sleep(1);
+        rfid_update(&rfid);
     }
 
     rfid_fini(&rfid);

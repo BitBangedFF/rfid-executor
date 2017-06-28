@@ -18,6 +18,8 @@
 
 
 #define OPEN_TIMEOUT_MS (5000)
+#define UPDATE_WAIT_SEC (1)
+#define UPDATE_ACCESS_ALLOWED_WAIT_SEC (3)
 #define LED_CHANNEL (1)
 
 
@@ -43,38 +45,6 @@ static int p_err(
     }
 
     return -1;
-}
-
-
-static void on_tag_handler(
-        PhidgetRFIDHandle handle,
-        void *ctx,
-        const char *tag,
-        PhidgetRFID_Protocol protocol)
-{
-    rfid_s * const rfid = (rfid_s*) ctx;
-
-    if(rfid != NULL)
-    {
-        const int status = exec_is_allowed(
-                tag,
-                rfid->on_tag_data);
-
-        if(status == EXEC_STATUS_ALLOWED)
-        {
-            (void) PhidgetDigitalOutput_setState(
-                    rfid->led_ch,
-                    1);
-        }
-
-        exec_on_tag(tag, rfid->on_tag_data);
-
-        (void) sleep(1);
-
-        (void) PhidgetDigitalOutput_setState(
-                rfid->led_ch,
-                0);
-    }
 }
 
 
@@ -135,18 +105,6 @@ int rfid_init(
             {
                 ret = p_err("Phidget_setDeviceSerialNumber", p_ret);
             }
-        }
-    }
-
-    if(ret == 0)
-    {
-        p_ret = PhidgetRFID_setOnTagHandler(
-                rfid->rfid_ch,
-                on_tag_handler,
-                (void*) rfid);
-        if(p_ret != EPHIDGET_OK)
-        {
-            ret = p_err("PhidgetRFID_setOnTagHandler", p_ret);
         }
     }
 
@@ -263,4 +221,54 @@ void rfid_fini(
             (void) p_err("PhidgetRFID_delete", p_ret);
         }
     }
+}
+
+
+void rfid_update(
+        rfid_s * const rfid)
+{
+    if(rfid != NULL)
+    {
+        PhidgetReturnCode p_ret;
+        int tag_present = 0;
+
+        p_ret = PhidgetRFID_getTagPresent(
+                rfid->rfid_ch,
+                &tag_present);
+
+        if((tag_present != 0) && (p_ret == EPHIDGET_OK))
+        {
+            PhidgetRFID_Protocol proto;
+
+            p_ret = PhidgetRFID_getLastTag(
+                    rfid->rfid_ch,
+                    rfid->last_tag,
+                    sizeof(rfid->last_tag),
+                    &proto);
+        }
+
+        if((tag_present != 0) && (p_ret == EPHIDGET_OK))
+        {
+            const int status = exec_is_allowed(
+                    rfid->last_tag,
+                    rfid->on_tag_data);
+
+            if(status == EXEC_STATUS_ALLOWED)
+            {
+                (void) PhidgetDigitalOutput_setState(
+                        rfid->led_ch,
+                        1);
+            }
+
+            exec_on_tag(rfid->last_tag, rfid->on_tag_data);
+
+            (void) sleep(UPDATE_ACCESS_ALLOWED_WAIT_SEC);
+        }
+
+        (void) PhidgetDigitalOutput_setState(
+                rfid->led_ch,
+                0);
+    }
+
+    (void) sleep(UPDATE_WAIT_SEC);
 }

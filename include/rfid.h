@@ -18,6 +18,7 @@ typedef struct
 {
     PhidgetRFIDHandle rfid_ch;
     PhidgetDigitalOutputHandle led_ch;
+    char last_tag[128];
     const on_tag_data_s *on_tag_data;
 } rfid_s;
 
@@ -28,6 +29,10 @@ int rfid_init(
 
 
 void rfid_fini(
+        rfid_s * const rfid);
+
+
+void rfid_update(
         rfid_s * const rfid);
 
 
